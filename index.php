@@ -73,18 +73,19 @@ function _file_get_contents($url, $headers = [], $data = null, $timeout = 30, &$
     return $response;
 }
 
-function bard($d)
+function bard($d = [])
 {
     $keys = [
         "AIzaSyDbEKAYJICTvG45GQyYHh97LbJmAMJ4dEk",
         "AIzaSyDn_j28y4bfXyulcxpIIUYjcZi7d3Bidz8",
     ];
     if (!$d["prompt"]) {
-        $d["prompt"] = $d["content"];
+        $d["prompt"] = isset($d["content"]) ? $d["content"] : null;
     }
     $d += [
         "temperature" => 0.7,
         "topP" => 1,
+        "key" => null
     ];
     $j = json_decode('{ 
       "contents": [
@@ -141,25 +142,31 @@ function bard($d)
     $return = array_merge($return, $json);
     return $return;
 }
-
-if (isv("ask")) {
-    $data = json_decode(file_get_contents('php://input'), true);
-    if ($data && isset($data["data"])) {
-        $_POST += $data["data"];
-    } else if ($data) {
-        $_POST += $data;
+$data = json_decode(file_get_contents('php://input'), true);
+if ($data && isset($data["data"])) {
+    $_POST += $data["data"];
+} else if ($data) {
+    $_POST += $data;
+}
+$_POST += $_GET;
+$_POST = array_map(function ($v) {
+    if (is_string($v)) {
+        $vc = strtolower($v);
+        if ($vc == "false" || $vc == "null" || $vc == "none" || $vc == "0" || $vc == "False")
+            $v = false;
+        else if ($v == "true")
+            $v = true;
     }
-    $_POST += $_GET;
-    $_POST = array_map(function ($v) {
-        if (is_string($v)) {
-            $vc = strtolower($v);
-            if ($vc == "false" || $vc == "null" || $vc == "none" || $vc == "0" || $vc == "False")
-                $v = false;
-            else if ($v == "true")
-                $v = true;
-        }
-        return $v;
-    }, $_POST);
-    $response = bard($_POST);
-    echo json_encode($response);
+    return $v;
+}, $_POST);
+$get = isv("get");
+
+switch ($get) {
+    case 'bard':
+        $response = bard($_POST);
+        echo json_encode($response);
+        break;
+    default:
+        header('HTTP/1.1 401 Unauthorized', true, 401);
+        break;
 }
